@@ -6,7 +6,7 @@ const {
     generateAuthenticationOptions, 
     verifyAuthenticationResponse 
 } = require('@simplewebauthn/server')
-
+const { isoUint8Array, isoBase64URL  } = require('@simplewebauthn/server/dist/helpers');
 
 if (!globalThis.crypto) {
     globalThis.crypto = crypto;
@@ -62,7 +62,7 @@ app.post('/register-challenge', async (req, res) => {
         const challengePayload = await generateRegistrationOptions({
             rpID,
             rpName: 'My Authentication App',
-            userID: userId,
+            userID: isoUint8Array.fromUTF8String(userId),
             userName: user.username,
             attestationType: 'none',
             authenticatorSelection: {

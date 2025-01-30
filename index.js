@@ -13,9 +13,9 @@ if (!globalThis.crypto) {
 
 const PORT = 3000
 const app = express();
-const rpID = process.env.NODE_ENV === 'production' ? 'your-domain.com' : 'localhost';
+const rpID = process.env.NODE_ENV === 'production' ? 'finger-bio.onrender.com' : 'localhost';
 const expectedOrigin = process.env.NODE_ENV === 'production' 
-    ? 'https://your-domain.com'
+    ? 'https://finger-bio.onrender.com'
     : 'http://localhost:3000';
 
 // Update CORS settings for mobile access

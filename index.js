@@ -14,6 +14,17 @@ if (!globalThis.crypto) {
 
 const PORT = 3000
 const app = express();
+const rpID = process.env.NODE_ENV === 'production' ? 'your-domain.com' : 'localhost';
+const expectedOrigin = process.env.NODE_ENV === 'production' 
+    ? 'https://your-domain.com'
+    : 'http://localhost:3000';
+
+// Update CORS settings for mobile access
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
 
 app.use(express.static('./public'))
 app.use(express.json())
@@ -47,34 +58,41 @@ app.post('/register-challenge', async (req, res) => {
 
     const user = userStore[userId]
 
-    const challengePayload = await generateRegistrationOptions({
-        rpID: 'localhost',
-        rpName: 'My Localhost Machine',
-        attestationType: 'none',
-        userName: user.username,
-        timeout: 30_000,
-    })
+    try {
+        const challengePayload = await generateRegistrationOptions({
+            rpID,
+            rpName: 'My Authentication App',
+            userID: userId,
+            userName: user.username,
+            attestationType: 'none',
+            authenticatorSelection: {
+                residentKey: 'preferred',
+                userVerification: 'preferred',
+                authenticatorAttachment: 'platform'
+            },
+            timeout: 60000,
+        });
 
-
-    console.log('challengePayload', challengePayload)
-    challengeStore[userId] = challengePayload.challenge
-
-    return res.json({ options: challengePayload })
-
+        challengeStore[userId] = challengePayload.challenge;
+        return res.json({ options: challengePayload });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: 'Failed to generate challenge' });
+    }
 })
 
 app.post('/register-verify', async (req, res) => {
     const { userId, cred }  = req.body
-    
-    if (!userStore[userId]) return res.status(404).json({ error: 'user not found!' })
+
+    // if (!userStore[userId]) return res.status(404).json({ error: 'user not found!' })
 
     const user = userStore[userId]
     const challenge = challengeStore[userId]
 
     const verificationResult = await verifyRegistrationResponse({
         expectedChallenge: challenge,
-        expectedOrigin: 'http://localhost:3000',
-        expectedRPID: 'localhost',
+        expectedOrigin,
+        expectedRPID: rpID,
         response: cred,
     })
 
@@ -121,4 +139,7 @@ app.post('/login-verify', async (req, res) => {
 })
 
 
-app.listen(PORT, '0.0.0.0', () => console.log(`Server started on PORT:${PORT}`))
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server started on PORT:${PORT}`);
+    console.log(`Server accessible at http://localhost:${PORT}`);
+});

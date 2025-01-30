@@ -21,22 +21,29 @@
         form.addEventListener('submit', async e => {
             e.preventDefault()
 
-            const response = await fetch('/register', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ 
-                    username: usernameField.value, 
-                    password: passwordField.value
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        username: usernameField.value, 
+                        password: passwordField.value
+                    })
                 })
-            })
 
-            const result = await response.json();
-            const { id } = result
+                const result = await response.json();
+                if (result.error) {
+                    throw new Error(result.error);
+                }
 
-            window.location.replace(`http://localhost:3000/profile.html?userId=${id}`)
-            
+                const { id } = result;
+                // Use relative path instead of absolute URL
+                window.location.href = `/profile.html?userId=${id}`;
+            } catch (error) {
+                alert('Registration failed: ' + error.message);
+            }
         })
     </script>
 </body>

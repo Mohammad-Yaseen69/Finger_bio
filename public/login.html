@@ -9,11 +9,13 @@
     <form id="login-form">
         <input type="text" placeholder="userId" id="userId" />
         <button type="submit">Login with Passkey</button>
+        <span id="error"></span>
     </form>
 
     <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
     <script>
          const form = document.getElementById('login-form');
+         const errorText = document.getElementById("error")
          const userIdField = document.getElementById('userId')
          const url = new URL(window.location);
          form.addEventListener('submit', async e => {
@@ -45,6 +47,7 @@
                 body: JSON.stringify({ userId, cred: authenticationResult })
             })
 
+            errorText.innerHTML = "Authentication done"
             
          })
 

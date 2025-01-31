@@ -1,9 +1,9 @@
 const express = require('express')
 const crypto = require("node:crypto");
-const { 
-    generateRegistrationOptions, 
-    verifyRegistrationResponse, 
-    generateAuthenticationOptions, 
+const {
+    generateRegistrationOptions,
+    verifyRegistrationResponse,
+    generateAuthenticationOptions,
     verifyAuthenticationResponse,
 } = require('@simplewebauthn/server')
 
@@ -14,7 +14,7 @@ if (!globalThis.crypto) {
 const PORT = 3000
 const app = express();
 const rpID = process.env.NODE_ENV === 'production' ? 'finger-bio.onrender.com' : 'localhost';
-const expectedOrigin = process.env.NODE_ENV === 'production' 
+const expectedOrigin = process.env.NODE_ENV === 'production'
     ? 'https://finger-bio.onrender.com'
     : 'http://localhost:3000';
 
@@ -36,6 +36,9 @@ app.post('/register', (req, res) => {
     const { username, password } = req.body
     const id = `user_${Date.now()}`
 
+    if(!username || !password){
+        return res.status(400).json({ error: 'username and password are required' })
+    }
     const user = {
         id,
         username,
@@ -96,7 +99,7 @@ app.post('/register-verify', async (req, res) => {
         if (verification.verified) {
             // Save the credential to the user's record
             const { registrationInfo } = verification;
-            
+
             // Store the authenticator data in the user record
             userStore[userId] = {
                 ...userStore[userId],
@@ -106,7 +109,7 @@ app.post('/register-verify', async (req, res) => {
                     counter: registrationInfo.counter,
                 }
             };
-            
+
             console.log('Updated user store:', userStore[userId]);
             res.json({ success: true });
         } else {
@@ -120,13 +123,17 @@ app.post('/register-verify', async (req, res) => {
 
 app.post('/login-challenge', async (req, res) => {
     try {
-        const { userId } = req.body;
-        
-        console.log(userId)
-        const user = userStore[userId];
-       console.log('user', user) 
+        const { userId, username } = req.body;
+
+
+        console.log(username)
+
         if (!userStore[userId]) {
             return res.status(404).json({ error: 'user not found!' });
+        }
+        const user = userStore[userId];
+        if (user.username !== username) {
+            return res.status(400).json({ error: 'Invalid username' });
         }
         if (!user.passkey) {
             return res.status(400).json({ error: 'No passkey registered for this user' });
@@ -143,7 +150,7 @@ app.post('/login-challenge', async (req, res) => {
         });
 
         challengeStore[userId] = opts.challenge;
-        
+
         return res.json({ options: opts });
     } catch (error) {
         console.error('Login challenge error:', error);
@@ -152,25 +159,41 @@ app.post('/login-challenge', async (req, res) => {
 });
 
 app.post('/login-verify', async (req, res) => {
-    const { userId, cred }  = req.body
+    try {
+        const { userId, cred } = req.body;
 
-    if (!userStore[userId]) return res.status(404).json({ error: 'user not found!' })
-    const user = userStore[userId]
-    const challenge = challengeStore[userId]
+        if (!userStore[userId]) {
+            return res.status(404).json({ error: 'user not found!' });
+        }
 
-    const result = await verifyAuthenticationResponse({
-        expectedChallenge: challenge,
-        expectedOrigin: 'http://localhost:3000',
-        expectedRPID: 'localhost',
-        response: cred,
-        authenticator: user.passkey
-    })
+        const user = userStore[userId];
+        const challenge = challengeStore[userId];
 
-    if (!result.verified) return res.json({ error: 'something went wrong' })
-    
-    // Login the user: Session, Cookies, JWT
-    return res.json({ success: true, userId })
-})
+        if (!user.passkey) {
+            return res.status(400).json({ error: 'No passkey found for this user' });
+        }
+
+        const verification = await verifyAuthenticationResponse({
+            response: cred,
+            expectedChallenge: challenge,
+            expectedOrigin,
+            expectedRPID: rpID,
+            authenticator: user.passkey,
+            requireUserVerification: false
+        });
+
+        if (verification.verified) {
+            // Update the stored counter
+            user.passkey.counter = verification.authenticationInfo.newCounter;
+            return res.json({ success: true, userId });
+        } else {
+            return res.status(400).json({ error: 'Verification failed' });
+        }
+    } catch (error) {
+        console.error('Login verification error:', error);
+        return res.status(400).json({ error: error.message });
+    }
+});
 
 
 app.listen(PORT, '0.0.0.0', () => {

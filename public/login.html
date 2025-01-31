@@ -7,7 +7,7 @@
 </head>
 <body>
     <form id="login-form">
-        <input type="text" placeholder="userId" id="userId" />
+        <input type="text" placeholder="your username" id="userId" />
         <button type="submit">Login with Passkey</button>
         <span id="error"></span>
     </form>
@@ -18,39 +18,62 @@
          const errorText = document.getElementById("error")
          const userIdField = document.getElementById('userId')
          const url = new URL(window.location);
+
          form.addEventListener('submit', async e => {
-             e.preventDefault()
-             const userId = userIdField.value;
-             const userIdParam = url.searchParams.get('userId');
+             try {
+                e.preventDefault()
+                errorText.textContent = 'Authenticating...';
+                const userIdParam = url.searchParams.get('userId');
+                
+                const response = await fetch('/login-challenge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ userId: userIdParam, username: userIdField.value })
+                });
 
-             console.log(userIdParam)
-            
-            const response = await fetch('/login-challenge', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ userId : userIdParam })
-            })
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to get challenge');
+                }
 
-            const challengeResult = await response.json()
-            const { options } = challengeResult // Server side challenge
+                const challengeResult = await response.json();
+                const authenticationResult = await SimpleWebAuthnBrowser.startAuthentication({
+                    ...challengeResult.options,
+                    userVerification: 'preferred'
+                });
 
-            const authenticationResult = await SimpleWebAuthnBrowser.startAuthentication(options)
-            
+                const verificationResponse = await fetch('/login-verify', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        userId: userIdParam, 
+                        cred: authenticationResult 
+                    })
+                });
 
-           const VerificationLogin =  await fetch('/login-verify', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ userId, cred: authenticationResult })
-            })
+                console.log(verificationResponse)
 
-            errorText.innerHTML = "Authentication done"
-            
-         })
+                if (!verificationResponse.ok) {
+                    const error = await verificationResponse.json();
+                    throw new Error(error.error || 'Verification failed');
+                }
 
+                const verifyResult = await verificationResponse.json();
+                if (verifyResult.success) {
+                    errorText.textContent = "Authentication successful!";
+                    // Redirect or handle successful login
+                } else {
+                    throw new Error(verifyResult.error || 'Authentication failed');
+                }
+             } catch (error) {
+                console.error('Login error:', error);
+                errorText.textContent = `Error: ${error.message}`;
+             }
+         });
     </script>
 </body>
 </html>

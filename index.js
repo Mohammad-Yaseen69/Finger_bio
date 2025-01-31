@@ -81,40 +81,75 @@ app.post('/register-challenge', async (req, res) => {
 })
 
 app.post('/register-verify', async (req, res) => {
-    const { userId, cred }  = req.body
+    try {
+        const { userId, cred } = req.body;
 
-    // if (!userStore[userId]) return res.status(404).json({ error: 'user not found!' })
+        // Verification configuration
+        const verification = await verifyRegistrationResponse({
+            response: cred,
+            expectedChallenge: challengeStore[userId],
+            expectedOrigin,
+            expectedRPID: rpID,
+            requireUserVerification: false
+        });
 
-    const user = userStore[userId]
-    const challenge = challengeStore[userId]
+        if (verification.verified) {
+            // Save the credential to the user's record
+            const { registrationInfo } = verification;
+            
+            // Store the authenticator data in the user record
+            userStore[userId] = {
+                ...userStore[userId],
+                passkey: {
+                    credentialID: Buffer.from(registrationInfo.credentialID),
+                    credentialPublicKey: Buffer.from(registrationInfo.credentialPublicKey),
+                    counter: registrationInfo.counter,
+                }
+            };
+            
+            console.log('Updated user store:', userStore[userId]);
+            res.json({ success: true });
+        } else {
+            res.status(400).json({ error: 'Verification failed' });
+        }
+    } catch (error) {
+        console.error('Verification error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
 
-    const verificationResult = await verifyRegistrationResponse({
-        expectedChallenge: challenge,
-        expectedOrigin,
-        expectedRPID: rpID,
-        response: cred,
-    })
-
-    if (!verificationResult.verified) return res.json({ error: 'could not verify' });
-    userStore[userId].passkey = verificationResult.registrationInfo
-
-    return res.json({ verified: true })
-
-})
- 
 app.post('/login-challenge', async (req, res) => {
-    const { userId } = req.body
-    if (!userStore[userId]) return res.status(404).json({ error: 'user not found!' })
-    
-    const opts = await generateAuthenticationOptions({
-        rpID: 'localhost',
-    })
+    try {
+        const { userId } = req.body;
+        
+        console.log(userId)
+        const user = userStore[userId];
+       console.log('user', user) 
+        if (!userStore[userId]) {
+            return res.status(404).json({ error: 'user not found!' });
+        }
+        if (!user.passkey) {
+            return res.status(400).json({ error: 'No passkey registered for this user' });
+        }
 
-    challengeStore[userId] = opts.challenge
+        const opts = await generateAuthenticationOptions({
+            rpID,
+            allowCredentials: [{
+                id: user.passkey.credentialID,
+                type: 'public-key',
+                transports: ['internal'],
+            }],
+            userVerification: 'preferred',
+        });
 
-    return res.json({ options: opts })
-})
-
+        challengeStore[userId] = opts.challenge;
+        
+        return res.json({ options: opts });
+    } catch (error) {
+        console.error('Login challenge error:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
 
 app.post('/login-verify', async (req, res) => {
     const { userId, cred }  = req.body

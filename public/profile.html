@@ -42,7 +42,15 @@
                 const challengeResult = await response.json();
                 statusMessage.textContent = 'Please follow your device\'s biometric prompt...';
 
-                const authenticationResult = await SimpleWebAuthnBrowser.startRegistration(challengeResult.options);
+                const authenticationResult = await SimpleWebAuthnBrowser.startRegistration({
+                    ...challengeResult.options,
+                    authenticatorSelection: {
+                        ...challengeResult.options.authenticatorSelection,
+                        userVerification: 'preferred'
+                    }
+                });
+
+                console.log('Authentication Result:', authenticationResult);
 
                 statusMessage.textContent = 'Verifying registration...';
                 const verifyResponse = await fetch('/register-verify', {
@@ -50,18 +58,27 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ userId, cred: authenticationResult })
+                    body: JSON.stringify({
+                        userId,
+                        cred: authenticationResult
+                    })
                 });
 
+                if (!verifyResponse.ok) {
+                    const errorData = await verifyResponse.json();
+                    throw new Error(errorData.error || 'Verification failed');
+                }
+
                 const verifyResult = await verifyResponse.json();
-                
+
                 if (verifyResult.error) {
                     throw new Error(verifyResult.error);
                 }
 
                 statusMessage.textContent = 'Passkey registered successfully!';
+                window.location.href = `/login.html?userId=` + userId;
             } catch (error) {
-                console.error(error);
+                console.error('Registration error:', error);
                 statusMessage.textContent = `Error: ${error.message}`;
             } finally {
                 registerPasskeyBtn.disabled = false;

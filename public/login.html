@@ -15,32 +15,37 @@
     <script>
          const form = document.getElementById('login-form');
          const userIdField = document.getElementById('userId')
-
+         const url = new URL(window.location);
          form.addEventListener('submit', async e => {
-            e.preventDefault()
-            const userId = userIdField.value;
+             e.preventDefault()
+             const userId = userIdField.value;
+             const userIdParam = url.searchParams.get('userId');
+
+             console.log(userIdParam)
             
             const response = await fetch('/login-challenge', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ userId })
+                body: JSON.stringify({ userId : userIdParam })
             })
 
             const challengeResult = await response.json()
             const { options } = challengeResult // Server side challenge
 
             const authenticationResult = await SimpleWebAuthnBrowser.startAuthentication(options)
-            console.log(authenticationResult)
+            
 
-            await fetch('/login-verify', {
+           const VerificationLogin =  await fetch('/login-verify', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ userId, cred: authenticationResult })
             })
+
+            
          })
 
     </script>

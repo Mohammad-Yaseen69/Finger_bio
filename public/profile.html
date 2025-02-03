@@ -8,6 +8,7 @@
 <body>
     <h1>Profile Page</h1>
     <div id="status-message"></div>
+    <div id="pass"></div>
     <button id="register-passkey-btn">Register Passkey</button>
 
     <script src="https://unpkg.com/@simplewebauthn/browser/dist/bundle/index.umd.min.js"></script>
@@ -16,6 +17,7 @@
         const statusMessage = document.getElementById('status-message');
         console.log(navigator?.userAgentData?.mobile)
 
+        document.getElementById("pass").innerHTML = navigator?.userAgentData?.mobile
         registerPasskeyBtn.addEventListener('click', async (e) => {
             try {
                 registerPasskeyBtn.disabled = true;

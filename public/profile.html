@@ -14,7 +14,7 @@
     <script>
         const registerPasskeyBtn = document.getElementById('register-passkey-btn');
         const statusMessage = document.getElementById('status-message');
-        console.log(SimpleWebAuthnBrowser)
+        console.log(navigator?.userAgentData?.mobile)
 
         registerPasskeyBtn.addEventListener('click', async (e) => {
             try {
